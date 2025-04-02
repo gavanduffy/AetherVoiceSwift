@@ -3,7 +3,7 @@
 ## Overview
 This project builds a multiplatform iOS/macOS application that can:
 1. Read a linked webpage
-2. Upload a document - txt, pdf, epub
+2. Upload a document - txt, pdf
 3. Read the uploaded documents using text to speech. The supported TTS synthesizers are:
   a) Local Apple TTS
   b) Amazon Polly Cloud TTS
