@@ -20,7 +20,7 @@ jobs:
       - name: Set up Ruby for CocoaPods
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '2.7' # Or a version compatible with your CocoaPods
+          ruby-version: '3.1' # Updated Ruby version
 
       - name: Install CocoaPods
         run: gem install cocoapods
@@ -39,9 +39,9 @@ jobs:
       - name: Discover Workspace
         id: discover_workspace
         run: |
-          # Find the .xcworkspace file. Assumes only one in the root.
-          # If your workspace is in a subdirectory, you'll need to adjust the path.
-          WORKSPACE_PATH=$(find . -maxdepth 2 -name "*.xcworkspace" | head -n 1) # Maxdepth 2 to search in root or one level down
+          # Find the .xcworkspace file.
+          # Searches in the root and one level down (e.g., ./AetherVoice/*.xcworkspace)
+          WORKSPACE_PATH=$(find . -maxdepth 2 -name "*.xcworkspace" -print -quit)
           if [ -z "$WORKSPACE_PATH" ]; then
             echo "Error: No .xcworkspace found in the root directory or one level down."
             exit 1
@@ -49,21 +49,23 @@ jobs:
           # Remove leading ./ if present
           WORKSPACE_NAME=$(basename "$WORKSPACE_PATH")
           echo "Discovered workspace: $WORKSPACE_NAME"
+          echo "WORKSPACE_PATH_FULL=$WORKSPACE_PATH" >> $GITHUB_OUTPUT # Store full path
           echo "WORKSPACE_NAME=$WORKSPACE_NAME" >> $GITHUB_OUTPUT
-          # Determine the directory of the workspace for pod install if needed later
-          # WORKSPACE_DIR=$(dirname "$WORKSPACE_PATH")
-          # echo "WORKSPACE_DIR=$WORKSPACE_DIR" >> $GITHUB_OUTPUT
+          # Determine the directory of the workspace
+          WORKSPACE_DIR=$(dirname "$WORKSPACE_PATH")
+          echo "WORKSPACE_DIR=$WORKSPACE_DIR" >> $GITHUB_OUTPUT
+
 
       - name: Build iOS Application
         env:
           # IMPORTANT: Replace 'AetherVoice' if your scheme name is different
           SCHEME_NAME: 'AetherVoice'
-          WORKSPACE_NAME: ${{ steps.discover_workspace.outputs.WORKSPACE_NAME }}
+          WORKSPACE_PATH_FULL: ${{ steps.discover_workspace.outputs.WORKSPACE_PATH_FULL }}
           DESTINATION: 'generic/platform=iOS Simulator'
         run: |
-          echo "Building iOS workspace: $WORKSPACE_NAME with scheme: $SCHEME_NAME"
+          echo "Building iOS workspace: $WORKSPACE_PATH_FULL with scheme: $SCHEME_NAME"
           xcodebuild build-for-testing \
-            -workspace "$WORKSPACE_NAME" \
+            -workspace "$WORKSPACE_PATH_FULL" \
             -scheme "$SCHEME_NAME" \
             -destination "$DESTINATION" \
             CODE_SIGN_IDENTITY="" \
@@ -89,7 +91,7 @@ jobs:
       - name: Set up Ruby for CocoaPods
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '2.7'
+          ruby-version: '3.1' # Updated Ruby version
 
       - name: Install CocoaPods
         run: gem install cocoapods
@@ -108,26 +110,32 @@ jobs:
       - name: Discover Workspace
         id: discover_workspace
         run: |
-          WORKSPACE_PATH=$(find . -maxdepth 2 -name "*.xcworkspace" | head -n 1)
+          # Find the .xcworkspace file.
+          # Searches in the root and one level down (e.g., ./AetherVoice/*.xcworkspace)
+          WORKSPACE_PATH=$(find . -maxdepth 2 -name "*.xcworkspace" -print -quit)
           if [ -z "$WORKSPACE_PATH" ]; then
             echo "Error: No .xcworkspace found."
             exit 1
           fi
           WORKSPACE_NAME=$(basename "$WORKSPACE_PATH")
           echo "Discovered workspace: $WORKSPACE_NAME"
+          echo "WORKSPACE_PATH_FULL=$WORKSPACE_PATH" >> $GITHUB_OUTPUT # Store full path
           echo "WORKSPACE_NAME=$WORKSPACE_NAME" >> $GITHUB_OUTPUT
+          # Determine the directory of the workspace
+          WORKSPACE_DIR=$(dirname "$WORKSPACE_PATH")
+          echo "WORKSPACE_DIR=$WORKSPACE_DIR" >> $GITHUB_OUTPUT
 
       - name: Build macOS Application
         env:
           # IMPORTANT: Replace 'AetherVoice' if your macOS scheme name is different
           SCHEME_NAME: 'AetherVoice' # Or e.g., 'AetherVoice (macOS)'
-          WORKSPACE_NAME: ${{ steps.discover_workspace.outputs.WORKSPACE_NAME }}
+          WORKSPACE_PATH_FULL: ${{ steps.discover_workspace.outputs.WORKSPACE_PATH_FULL }}
           DESTINATION: 'generic/platform=macOS' # For building a generic macOS app
           # Or for a specific architecture: 'platform=macOS,arch=x86_64' or 'platform=macOS,arch=arm64'
         run: |
-          echo "Building macOS workspace: $WORKSPACE_NAME with scheme: $SCHEME_NAME"
+          echo "Building macOS workspace: $WORKSPACE_PATH_FULL with scheme: $SCHEME_NAME"
           xcodebuild build-for-testing \
-            -workspace "$WORKSPACE_NAME" \
+            -workspace "$WORKSPACE_PATH_FULL" \
             -scheme "$SCHEME_NAME" \
             -destination "$DESTINATION" \
             CODE_SIGN_IDENTITY="" \
