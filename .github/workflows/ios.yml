@@ -2,91 +2,31 @@
 name: Build iOS (Unsigned)
 
 on:
-  push:
-    branches: [ "main" ] # Triggers on pushes to the main branch
-  pull_request:
-    branches: [ "main" ] # Triggers on pull requests to the main branch
   workflow_dispatch: # Allows manual triggering
 
 jobs:
-  build_ios:
-    name: Build iOS App for Simulator (Unsigned)
-    runs-on: macos-latest # Use the latest macOS runner
-
+  build:
+    runs-on: macos-14
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Ruby for CocoaPods
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '2.7' # Or a version compatible with your CocoaPods
-
-      - name: Install CocoaPods
-        run: gem install cocoapods
-
-      # If your Podfile is not in the root, adjust the working-directory
-      # e.g., working-directory: ./AetherVoice
-      - name: Install Pod dependencies
-        run: pod install --repo-update
-
-      - name: Select latest Xcode
+      - uses: actions/checkout@v4
+      - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: 'latest-stable' # Or specify a particular version e.g. '15.3'
-
-      - name: Discover Workspace
-        id: discover_workspace
-        run: |
-          # Find the .xcworkspace file. Assumes only one in the root.
-          # If your workspace is in a subdirectory, you'll need to adjust the path.
-          WORKSPACE_PATH=$(find . -maxdepth 1 -name "*.xcworkspace" | head -n 1)
-          if [ -z "$WORKSPACE_PATH" ]; then
-            echo "Error: No .xcworkspace found in the root directory."
-            exit 1
-          fi
-          # Remove leading ./ if present
-          WORKSPACE_NAME=$(basename "$WORKSPACE_PATH")
-          echo "Discovered workspace: $WORKSPACE_NAME"
-          echo "WORKSPACE_NAME=$WORKSPACE_NAME" >> $GITHUB_OUTPUT
-
-      - name: Build iOS Application
+          xcode-version: latest-stable
+      - name: Get commit SHA
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: Build
+        run: xcodebuild -scheme AetherVoice -configuration Release archive -archivePath build/AetherVoice.xcarchive CODE_SIGN_IDENTITY= CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
         env:
-          # IMPORTANT: Replace 'YOUR_SCHEME_NAME' with the actual scheme you want to build
-          # For example, if your app is AetherVoice, your scheme might also be AetherVoice.
-          SCHEME_NAME: 'AetherVoice' # <<< CHANGE THIS TO YOUR SCHEME
-          WORKSPACE_NAME: ${{ steps.discover_workspace.outputs.WORKSPACE_NAME }}
-          # Using a generic iOS simulator destination
-          DESTINATION: 'generic/platform=iOS Simulator'
+          IS_NIGHTLY: YES
+      - name: Package ipa
         run: |
-          echo "Building workspace: $WORKSPACE_NAME with scheme: $SCHEME_NAME"
-          # xcodebuild clean build \
-          #   -workspace "$WORKSPACE_NAME" \
-          #   -scheme "$SCHEME_NAME" \
-          #   -destination "$DESTINATION" \
-          #   CODE_SIGN_IDENTITY="" \
-          #   CODE_SIGNING_REQUIRED=NO \
-          #   ONLY_ACTIVE_ARCH=NO
-          
-          # Alternative build command that might be more robust for some projects
-          # This command builds for testing, which is often used in CI for simulators
-          # It also disables code signing.
-          xcodebuild build-for-testing \
-            -workspace "$WORKSPACE_NAME" \
-            -scheme "$SCHEME_NAME" \
-            -destination "$DESTINATION" \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            ONLY_ACTIVE_ARCH=NO
-
-      # If you want to upload the build output as an artifact (optional)
-      - name: Upload Build Artifacts
+          mkdir Payload
+          cp -r build/AetherVoice.xcarchive/Products/Applications/AetherVoice.app Payload
+          zip -r AetherVoice-${{ env.sha_short }}.ipa Payload
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-           name: iOS-Build-Output-${{ env.SCHEME_NAME }}
-      #     # Adjust the path to where your .app is built.
-      #     # This path can vary based on Xcode versions and project settings.
-      #     # Example: DerivedData/Build/Products/Debug-iphonesimulator/*.app
-           path: |
-             **/Build/Products/*-iphonesimulator/*.app 
-      #     if-no-files-found: error # Fails the step if no files are found
+          name: AetherVoice-${{ env.sha_short }}.ipa
+          path: AetherVoice-${{ env.sha_short }}.ipa
+          if-no-files-found: error
